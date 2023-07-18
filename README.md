@@ -217,7 +217,7 @@ installHttpd.sh
 #! /bin/bash -ex
 yum update -y
 yum install -y httpd
-echo "<h2>Welcome to Terraform !!! </h2>" >> /var/www/html/index.html
+echo "<h2> Welcome to Terraform !!! </h2>" >> /var/www/html/index.html
 service httpd start
 chkconfig httpd on
 ```
@@ -242,9 +242,9 @@ $ terraform apply -auto-approve
 
 ### 7) S3 bucket
 
-verify S3 bucket permission (IAM policy)
+Pre-requisite: verify S3 bucket permission (IAM policy)
 
-myfirsttfvm.tf
+myfirsttfbucket.tf
 ```
 provider "aws" {
   region = "us-east-2"
@@ -265,7 +265,7 @@ $ terraform apply -auto-approve
 -------------
 verify RDS permission (IAM policy)
 
-myfirsttfvm.tf
+myfirsttfrds.tf
 ```
 provider "aws" {
   region     = "us-east-2"
@@ -296,8 +296,8 @@ https://registry.terraform.io/providers/hashicorp/aws/latest/docs
 
 https://developer.hashicorp.com/terraform/tutorials/certification-associate-tutorials-003
 
-**List state files**
+**List state files:**
 $ terraform state list
 
-**Destroy Resources**
+**Destroy Resources:**
 $ terraform apply -destroy
