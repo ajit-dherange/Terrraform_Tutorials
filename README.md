@@ -180,7 +180,67 @@ $ sudo su
 $ terraform plan
 $ terraform apply -auto-approve
 
-### 6) S3 bucket
+### 6) Multiple EC2 Instances using User Data
+Pre-requisite: Create new folder named EC2Instances and update profile using command **aws configure**
+
+vars.tf
+```
+variable "instance_name" {
+  description = "Name of the instance to be created"
+  default     = "Terraform"
+}
+variable "instance_type" {
+  default = "t2.micro"
+}
+variable "ami_id" {
+  description = "The AMI to use"
+  default     = "ami-05842f1afbf311a43"
+}
+variable "number_of_instances" {
+  description = "number of instances to be created"
+  default     = 3
+}
+variable "ami_key_pair_name" {
+  default = "cts-demo"
+}
+```
+
+main.tf
+```
+provider "aws" {
+  profile = "default"
+  region  = "us-east-2"
+}
+```
+installHttpd.sh
+```
+#! /bin/bash -ex
+yum update -y
+yum install -y httpd
+echo "<h2>Welcome to Terraform !!! </h2>" >> /var/www/html/index.html
+service httpd start
+chkconfig httpd on
+```
+
+ec2.tf
+```
+resource "aws_instance" "TFDemo3" {
+  ami             = var.ami_id
+  instance_type   = var.instance_type
+  count           = var.number_of_instances
+  key_name        = var.ami_key_pair_name
+  user_data       = file("installHttpd.sh")
+  security_groups = ["my-tf-sg"]
+  tags = {
+    Name = "${var.instance_name}_${count.index}"
+  }
+}
+```
+$ sudo su
+$ terraform plan
+$ terraform apply -auto-approve
+
+### 7) S3 bucket
 
 verify S3 bucket permission (IAM policy)
 
@@ -201,7 +261,7 @@ $ sudo su
 $ terraform plan
 $ terraform apply -auto-approve
 
-### 6) Mysql DB
+### 8) Mysql DB
 -------------
 verify RDS permission (IAM policy)
 
@@ -236,3 +296,8 @@ https://registry.terraform.io/providers/hashicorp/aws/latest/docs
 
 https://developer.hashicorp.com/terraform/tutorials/certification-associate-tutorials-003
 
+**List state files**
+$ terraform state list
+
+**Destroy Resources**
+$ terraform apply -destroy
