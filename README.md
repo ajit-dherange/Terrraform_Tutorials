@@ -180,8 +180,16 @@ $ sudo su
 $ terraform plan
 $ terraform apply -auto-approve
 
-### 6) Multiple EC2 Instances using User Data
+### 6) Multiple EC2 Instances using User Data and Instance name
 Pre-requisite: Create new folder named EC2Instances and update profile using command **aws configure**
+
+main.tf
+```
+provider "aws" {
+  profile = "default"
+  region  = "us-east-2"
+}
+```
 
 vars.tf
 ```
@@ -203,15 +211,33 @@ variable "number_of_instances" {
 variable "ami_key_pair_name" {
   default = "cts-demo"
 }
+variable "security_group" {
+  default = "web-server-sg-tf"
+  }
 ```
 
-main.tf
+sg.tf
 ```
-provider "aws" {
-  profile = "default"
-  region  = "us-east-2"
+resource "aws_security_group" "web_server_sg_tf" {
+  name        = "web-server-sg-tf"
+  description = "Allow HTTP to web server"
+  vpc_id      = "vpc-07b2af77184cf668e"
+  ingress {
+    description = "HTTPS ingress"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
 ```
+
 installHttpd.sh
 ```
 #! /bin/bash -ex
@@ -230,15 +256,16 @@ resource "aws_instance" "TFDemo3" {
   count           = var.number_of_instances
   key_name        = var.ami_key_pair_name
   user_data       = file("installHttpd.sh")
-  security_groups = ["my-tf-sg"]
+  security_groups = [var.security_group]
   tags = {
     Name = "${var.instance_name}_${count.index}"
   }
 }
 ```
+
 $ sudo su
 $ terraform plan
-$ terraform apply -auto-approve
+$ terraform apply -auto-approve >> Apply complete! Resources: 4 added, 0 changed, 0 destroyed
 
 ### 7) S3 bucket
 
@@ -296,8 +323,10 @@ https://registry.terraform.io/providers/hashicorp/aws/latest/docs
 
 https://developer.hashicorp.com/terraform/tutorials/certification-associate-tutorials-003
 
-**List state files:**
-$ terraform state list
+**List state files:** $ terraform state list
 
-**Destroy Resources:**
-$ terraform apply -destroy
+**Inspect the current state:** $ terraform show
+
+**Destroy Resources:** $ terraform apply -destroy
+
+**Connect to instance using powershell:** $ ssh ec2-user@<Instance_PublicIP> -i cts-demo.pem
