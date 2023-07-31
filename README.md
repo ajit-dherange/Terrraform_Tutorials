@@ -368,7 +368,7 @@ variable "security_group" {
   }
 ```
 
-3. Create provide.tf
+3. Create provider.tf
 ```
 provider "aws" {
   region     = var.aws_region
