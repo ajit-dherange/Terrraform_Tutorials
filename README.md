@@ -11,6 +11,10 @@ sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinu
 # Install Terraform
 sudo yum -y install terraform
 ```
+or 
+
+Install Terraform in your Windows PC / Laptop
+
 
 **2) Connect to AWS**
 ```
