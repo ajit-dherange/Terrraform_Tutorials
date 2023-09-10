@@ -385,24 +385,151 @@ $ terraform init
 6. Create vpc.tf
 ```
 resource "aws_vpc" "prod_vpc" {
-    cidr_blocks         = "10.0.0.0/160
+    cidr_blocks         = "10.0.0.0/16"
     enable_dns_support  = "true"
     enable_dns_hostname = "true"
     enable_classiclink  = "true"
-    instance)tenance    = "default"
+    instance_tenancy = “default”
     tags = {
      Name = "prod_vpc"
    }
   }
 ```
-7. Create public subnet
-8. Create Internat Gateway
-9. Create Custom Route Table
-10. Associate CRT and Subnet
-11. Create Security Group
-12. Add AMI varible into vars.tf
-13. Create EC2
-14. Create key-pair
-15. We are ready - Create resources
+7. Create public subnet (network.tf)
+```
+resource “aws_subnet” “prod-subnet-public-1” {
+    vpc_id = “${aws_vpc.prod-vpc.id}”
+    cidr_block = “10.0.1.0/24”
+    map_public_ip_on_launch = “true” //it makes this a public subnet
+    availability_zone = “eu-west-2a”
+    tags {
+        Name = “prod-subnet-public-1”
+    }
+}
+```
+9. Create Internat Gateway (network.tf)
+```
+resource "aws_internet_gateway" "prod-igw" {
+    vpc_id = "${aws_vpc.prod-vpc.id}"
+    tags {
+        Name = "prod-igw"
+    }
+}
+```
+11. Create Custom Route Table for public subnet (network.tf)
+```
+resource "aws_route_table" "prod-public-crt" {
+    vpc_id = "${aws_vpc.main-vpc.id}"
+    
+    route {
+        //associated subnet can reach everywhere
+        cidr_block = "0.0.0.0/0" 
+        //CRT uses this IGW to reach internet
+        gateway_id = "${aws_internet_gateway.prod-igw.id}" 
+    }
+    
+    tags {
+        Name = "prod-public-crt"
+    }
+}
+```
+13. Associate CRT and Subnet (network.tf)
+```
+resource "aws_route_table_association" "prod-crta-public-subnet-1"{
+    subnet_id = "${aws_subnet.prod-subnet-public-1.id}"
+    route_table_id = "${aws_route_table.prod-public-crt.id}"
+}
+```
+15. Create Security Group (network.tf)
+```
+resource "aws_security_group" "ssh-allowed" {
+    vpc_id = "${aws_vpc.prod-vpc.id}"
+    
+    egress {
+        from_port = 0
+        to_port = 0
+        protocol = -1
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+    ingress {
+        from_port = 22
+        to_port = 22
+        protocol = "tcp"
+        // This means, all ip address are allowed to ssh ! 
+        // Do not do it in the production. 
+        // Put your office or home address in it!
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+    //If you do not add this rule, you can not reach the NGIX  
+    ingress {
+        from_port = 80
+        to_port = 80
+        protocol = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+    tags {
+        Name = "ssh-allowed"
+    }
+}
+```
+17. Add AMI varible into vars.tf
+```
+variable "AMI" {
+    type = "map"
+    
+    default {
+        eu-west-2 = "ami-03dea29b0216a1e03"
+        us-east-1 = "ami-0c2a1acae6667e438"
+    }
+}
+```
+19. Create EC2
+```
+resource "aws_instance" "web1" {
+    ami = "${lookup(var.AMI, var.AWS_REGION)}"
+    instance_type = "t2.micro"
+    # VPC
+    subnet_id = "${aws_subnet.prod-subnet-public-1.id}"
+    # Security Group
+    vpc_security_group_ids = ["${aws_security_group.ssh-allowed.id}"]
+    # the Public SSH key
+    key_name = "${aws_key_pair.london-region-key-pair.id}"
+    # nginx installation
+    provisioner "file" {
+        source = "nginx.sh"
+        destination = "/tmp/nginx.sh"
+    }
+    provisioner "remote-exec" {
+        inline = [
+             "chmod +x /tmp/nginx.sh",
+             "sudo /tmp/nginx.sh"
+        ]
+    }
+    connection {
+        user = "${var.EC2_USER}"
+        private_key = "${file("${var.PRIVATE_KEY_PATH}")}"
+    }
+}
+// Sends your public key to the instance
+resource "aws_key_pair" "london-region-key-pair" {
+    key_name = "london-region-key-pair"
+    public_key = "${file(var.PUBLIC_KEY_PATH)}"
+}
+```
+21. Create key-pair
+```
+$ ssh-keygen -f tf-demo-key=pair
+```
+23. We are ready - Create resources
+```
+terraform plan -out terraform.out
+terraform apply terraform.out
+```
+24. Verification
 
-   
+Browse the public IP of the EC2 instance, it should show NGNIX welcome page - Welcome to ngnix!
+
+26. Destroy
+```
+terraform destroy
+```
