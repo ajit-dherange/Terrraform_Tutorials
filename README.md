@@ -522,8 +522,8 @@ $ ssh-keygen -f tf-demo-key=pair
 ```
 23. We are ready - Create resources
 ```
-terraform plan -out terraform.out
-terraform apply terraform.out
+$ terraform plan -out terraform.out
+$ terraform apply terraform.out
 ```
 24. Verification
 
@@ -531,5 +531,5 @@ Browse the public IP of the EC2 instance, it should show NGNIX welcome page - We
 
 26. Destroy
 ```
-terraform destroy
+$ terraform apply -destroy
 ```
