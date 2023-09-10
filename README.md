@@ -1,4 +1,4 @@
-# Terrraform_Tutorials
+# Terrraform_Tutorials-I
 
 ### Pre-requisite:
 
@@ -336,9 +336,11 @@ https://developer.hashicorp.com/terraform/tutorials/certification-associate-tuto
 **Connect to instance using powershell:** $ ssh ec2-user@<Instance_PublicIP> -i cts-demo.pem
 
 
-## Let's Start With Real Life Examples!
+# Let's Start With Real Life Examples!
 
-1. Create Working directory, I created TF-UCS
+## Example 1 - Create EC2 instance in Public Subnet with apache (httpd)
+
+1. Create Working directory, I created TF-Demo
 
 2. create vars.tf
 ```
@@ -395,6 +397,7 @@ resource "aws_vpc" "prod_vpc" {
    }
   }
 ```
+
 7. Create public subnet (vpc.tf)
 ```
 resource “aws_subnet” “prod-subnet-public-1” {
@@ -407,6 +410,7 @@ resource “aws_subnet” “prod-subnet-public-1” {
     }
 }
 ```
+
 9. Create Internat Gateway (network.tf)
 ```
 resource "aws_internet_gateway" "prod-igw" {
@@ -416,7 +420,8 @@ resource "aws_internet_gateway" "prod-igw" {
     }
 }
 ```
-11. Create Custom Route Table for public subnet (network.tf)
+
+10. Create Custom Route Table for public subnet (network.tf)
 ```
 resource "aws_route_table" "prod-public-crt" {
     vpc_id = "${aws_vpc.main-vpc.id}"
@@ -433,14 +438,16 @@ resource "aws_route_table" "prod-public-crt" {
     }
 }
 ```
-13. Associate CRT and Subnet (network.tf)
+
+11. Associate CRT and Subnet (network.tf)
 ```
 resource "aws_route_table_association" "prod-crta-public-subnet-1"{
     subnet_id = "${aws_subnet.prod-subnet-public-1.id}"
     route_table_id = "${aws_route_table.prod-public-crt.id}"
 }
 ```
-15. Create Security Group (network.tf)
+
+12. Create Security Group (network.tf)
 ```
 resource "aws_security_group" "ssh-allowed" {
     vpc_id = "${aws_vpc.prod-vpc.id}"
@@ -472,7 +479,8 @@ resource "aws_security_group" "ssh-allowed" {
     }
 }
 ```
-17. Add AMI varible into vars.tf
+
+13. Add AMI varible into vars.tf
 ```
 variable "AMI" {
     type = "map"
@@ -483,7 +491,8 @@ variable "AMI" {
     }
 }
 ```
-19. Create EC2
+
+14. Create EC2
 ```
 resource "aws_instance" "web1" {
     ami = "${lookup(var.AMI, var.AWS_REGION)}"
@@ -516,20 +525,188 @@ resource "aws_key_pair" "london-region-key-pair" {
     public_key = "${file(var.PUBLIC_KEY_PATH)}"
 }
 ```
-21. Create key-pair
+
+15. Create key-pair
 ```
-$ ssh-keygen -f tf-demo-key=pair
+$ ssh-keygen -f tf-demo-key-pair
+or 
+$ aws ec2 create-key-pair --key-name MyKeyPair --query 'KeyMaterial' --output text > ~/.ssh/MyKeyPair.pem
+$ chmod 400  ~/.ssh/MyKeyPair.pem
 ```
-23. We are ready - Create resources
+
+16. We are ready - Create resources
 ```
 $ terraform plan -out terraform.out
 $ terraform apply terraform.out
 ```
-24. Verification
+
+17. Verification
 
 Browse the public IP of the EC2 instance, it should show NGNIX welcome page - Welcome to ngnix!
 
-26. Destroy
+18. Destroy
 ```
 $ terraform apply -destroy
 ```
+
+## Example 2 - Create EC2 instance in Public Subnet with NGNIX
+
+### Pre-requisite:
+setup a new ssh key for this instance, run the following command using the aws cli
+
+```
+$ aws ec2 create-key-pair --key-name MyKeyPair --query 'KeyMaterial' --output text > ~/.ssh/MyKeyPair.pem
+chmod 400  ~/.ssh/MyKeyPair.pem
+```
+
+**When setting up a new VPC to deploy EC2 instances, we usually follow these basic steps...**
+
+Create a vpc
+
+Create subnets for different parts of the infrastructure
+
+Attach an internet gateway to the VPC
+
+Create a route table for a public subnet
+
+Create security groups to allow specific traffic
+
+Create ec2 instances on the subnets
+
+1. Create main.tf
+```
+provider "aws" {
+  profile = "default"
+  region  = "us-east-1"
+}
+
+# Create vpc
+resource "aws_vpc" "some_custom_vpc" {
+  cidr_block = "10.0.0.0/16"
+
+  tags = {
+    Name = "Some Custom VPC"
+  }
+}
+
+# Create pub subnet
+resource "aws_subnet" "some_public_subnet" {
+  vpc_id            = aws_vpc.some_custom_vpc.id
+  cidr_block        = "10.0.1.0/24"
+  availability_zone = "us-east-1a"
+
+  tags = {
+    Name = "Some Public Subnet"
+  }
+}
+
+# Create pvt subnet
+resource "aws_subnet" "some_private_subnet" {
+  vpc_id            = aws_vpc.some_custom_vpc.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = "us-east-1a"
+
+  tags = {
+    Name = "Some Private Subnet"
+  }
+}
+
+# create IGW
+resource "aws_internet_gateway" "some_ig" {
+  vpc_id = aws_vpc.some_custom_vpc.id
+
+  tags = {
+    Name = "Some Internet Gateway"
+  }
+}
+
+# Create RT
+resource "aws_route_table" "public_rt" {
+  vpc_id = aws_vpc.some_custom_vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.some_ig.id
+  }
+
+  route {
+    ipv6_cidr_block = "::/0"
+    gateway_id      = aws_internet_gateway.some_ig.id
+  }
+
+  tags = {
+    Name = "Public Route Table"
+  }
+}
+
+# attach an internet gateway to the VPC
+resource "aws_route_table_association" "public_1_rt_a" {
+  subnet_id      = aws_subnet.some_public_subnet.id
+  route_table_id = aws_route_table.public_rt.id
+}
+
+# Create security groups
+resource "aws_security_group" "web_sg" {
+  name   = "HTTP and SSH"
+  vpc_id = aws_vpc.some_custom_vpc.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = -1
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# create EC2 instance
+resource "aws_instance" "web_instance" {
+  ami           = "ami-0533f2ba8a1995cf9"
+  instance_type = "t2.nano"
+  key_name      = "MyKeyPair2"
+
+  subnet_id                   = aws_subnet.some_public_subnet.id
+  vpc_security_group_ids      = [aws_security_group.web_sg.id]
+  associate_public_ip_address = true
+
+  user_data = <<-EOF
+  #!/bin/bash -ex
+
+  amazon-linux-extras install nginx1 -y
+  echo "<h1>$(curl https://api.kanye.rest/?format=text)</h1>" >  /usr/share/nginx/html/index.html 
+  systemctl enable nginx
+  systemctl start nginx
+  EOF
+
+  tags = {
+    "Name" : "Kanye"
+  }
+}
+```
+
+2. Here's what everything looks like as a single .tf file. Use the following commands to:
+
+$ terraform init: Setup a new terraform project for this file.
+
+$ terraform apply: Setup the infrastructure as it's defined in the .tf file.
+
+$ terraform destroy: Tear down everything that terraform created.
+
+$ terraform state list: Show everything that was created by terraform.
+
+$ terraform state show aws_instance.web_instance: Show the details about the ec2 instance that was deployed.
+
+3. Use that last command to get the public IP address of the ec2 instance so you can visit it in your web browser and test ngnix is loading properly
+
