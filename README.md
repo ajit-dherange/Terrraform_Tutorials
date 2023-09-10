@@ -382,7 +382,7 @@ $ terraform init
 
 5. After initilization .terraform file get created
    
-6. Create vpc.tf
+6. Create VPC (vpc.tf)
 ```
 resource "aws_vpc" "prod_vpc" {
     cidr_blocks         = "10.0.0.0/16"
@@ -395,7 +395,7 @@ resource "aws_vpc" "prod_vpc" {
    }
   }
 ```
-7. Create public subnet (network.tf)
+7. Create public subnet (vpc.tf)
 ```
 resource “aws_subnet” “prod-subnet-public-1” {
     vpc_id = “${aws_vpc.prod-vpc.id}”
